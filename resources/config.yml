@@ -1,0 +1,29 @@
+# Time before AFK warning (seconds)
+afk-time: 180
+
+# Countdown before action
+countdown: 10
+
+# Movement sensitivity
+movement-threshold: 0.15
+
+# Mode: kick / teleport / transfer
+mode: "transfer"
+
+kick:
+  message: "§cYou were kicked for being AFK."
+
+teleport:
+  world: "afk_world"
+
+transfer:
+  servers:
+    - "127.0.0.1:19133"
+    - "127.0.0.1:19134"
+
+messages:
+  actionbar: "§eYou will be moved in {seconds}s"
+  afk-on: "§7You are now AFK."
+  afk-off: "§aYou are no longer AFK."
+  afk-list-header: "§6AFK Players:"
+  no-afk: "§aNo players are AFK."
