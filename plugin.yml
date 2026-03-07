@@ -1,0 +1,19 @@
+name: BetterAFKKick
+version: 3.0.0
+api: 5.0.0
+main: DevRaven\BetterAFKKick\Main
+author: DevRaven
+description: Advanced AFK management plugin
+
+commands:
+  afk:
+    description: AFK commands
+    usage: "/afk [toggle|list]"
+    permission: betterafkkick.command
+
+permissions:
+  betterafkkick.command:
+    default: true
+
+  betterafkkick.bypass:
+    default: op
