@@ -8,7 +8,7 @@ countdown: 10
 movement-threshold: 0.15
 
 # Mode: kick / teleport / transfer
-mode: "kick"
+mode: "transfer"
 
 kick:
   message: "§cYou were kicked for being AFK."
@@ -21,10 +21,9 @@ transfer:
     - "127.0.0.1:19133"
     - "127.0.0.1:19134"
 
-# Title settings when player becomes AFK
 title:
   title: "§cYOU ARE AFK"
-  subtitle: "§7You gonna be kicked soon if you don't move"
+  subtitle: "§7You gonna get kicked soon in {cooldown}s"
   sound: "note.bell"
 
 messages:
@@ -33,3 +32,4 @@ messages:
   afk-off: "§aYou are no longer AFK."
   afk-list-header: "§6AFK Players:"
   no-afk: "§aNo players are AFK."
+
