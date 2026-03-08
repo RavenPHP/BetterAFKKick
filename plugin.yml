@@ -13,7 +13,12 @@ commands:
 
 permissions:
   betterafkkick.command:
-    default: true
+    default: op
 
   betterafkkick.bypass:
     default: op
+
+  betterafkkick.afklist:
+    description: Allows staff to see AFK players GUI
+    default: op
+
