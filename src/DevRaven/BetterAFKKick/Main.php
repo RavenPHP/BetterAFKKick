@@ -32,7 +32,6 @@ class Main extends PluginBase implements Listener{
 
         $this->getServer()->getPluginManager()->registerEvents($this, $this);
 
-        // Runs every 1 second
         $this->getScheduler()->scheduleRepeatingTask(
             new ClosureTask(function(): void{
                 $this->checkAFK();
@@ -56,7 +55,6 @@ class Main extends PluginBase implements Listener{
             return;
         }
 
-        // Ignore movement inside same block
         if(
             $from->getFloorX() === $to->getFloorX() &&
             $from->getFloorY() === $to->getFloorY() &&
@@ -67,7 +65,6 @@ class Main extends PluginBase implements Listener{
 
         $threshold = (float)$this->config->get("movement-threshold");
 
-        // Optimized distance check
         if($from->distanceSquared($to) > ($threshold * $threshold)){
             $name = $player->getName();
             $this->lastActivity[$name] = time();
@@ -162,11 +159,10 @@ class Main extends PluginBase implements Listener{
             $server = $servers[array_rand($servers)];
             [$ip, $port] = explode(":", $server);
 
-            $pk = new TransferPacket();
-            $pk->address = $ip;
-            $pk->port = (int)$port;
-
-            $player->getNetworkSession()->sendDataPacket($pk);
+            // ✅ Correct PM5 way
+            $player->getNetworkSession()->sendDataPacket(
+                TransferPacket::create($ip, (int)$port)
+            );
         }
     }
 
@@ -224,4 +220,5 @@ class Main extends PluginBase implements Listener{
         return false;
     }
 }
+
 
