@@ -13,6 +13,7 @@ use pocketmine\event\player\PlayerMoveEvent;
 use pocketmine\scheduler\ClosureTask;
 use pocketmine\scheduler\CancelTaskException;
 use pocketmine\network\mcpe\protocol\TransferPacket;
+use pocketmine\network\mcpe\protocol\PlaySoundPacket;
 
 class Main extends PluginBase implements Listener{
 
@@ -100,10 +101,16 @@ class Main extends PluginBase implements Listener{
 
     private function startCountdown(Player $player, int $seconds): void{
 
+        $title = $this->config->getNested("title.title");
+        $subtitle = $this->config->getNested("title.subtitle");
+        $sound = $this->config->getNested("title.sound");
+
         $actionbar = $this->config->getNested("messages.actionbar");
 
+        $player->sendTitle($title, $subtitle, 10, 40, 10);
+
         $this->getScheduler()->scheduleRepeatingTask(
-            new ClosureTask(function() use ($player, &$seconds, $actionbar): void{
+            new ClosureTask(function() use ($player, &$seconds, $actionbar, $sound): void{
 
                 if(
                     !$player->isOnline() ||
@@ -119,6 +126,16 @@ class Main extends PluginBase implements Listener{
 
                 $msg = str_replace("{seconds}", (string)$seconds, $actionbar);
                 $player->sendActionBarMessage($msg);
+
+                $pk = new PlaySoundPacket();
+                $pk->soundName = $sound;
+                $pk->x = $player->getLocation()->getX();
+                $pk->y = $player->getLocation()->getY();
+                $pk->z = $player->getLocation()->getZ();
+                $pk->volume = 1;
+                $pk->pitch = 1;
+
+                $player->getNetworkSession()->sendDataPacket($pk);
 
                 $seconds--;
 
@@ -180,21 +197,12 @@ class Main extends PluginBase implements Listener{
 
             if(isset($args[0]) && $args[0] === "list"){
 
-                if(empty($this->afkPlayers)){
-                    $sender->sendMessage(
-                        $this->config->getNested("messages.no-afk")
-                    );
+                if(!$sender->hasPermission("betterafkkick.afklist")){
+                    $sender->sendMessage("§cNo permission.");
                     return true;
                 }
 
-                $sender->sendMessage(
-                    $this->config->getNested("messages.afk-list-header")
-                );
-
-                foreach(array_keys($this->afkPlayers) as $name){
-                    $sender->sendMessage("§7- " . $name);
-                }
-
+                $this->openAFKGUI($sender);
                 return true;
             }
 
@@ -210,7 +218,6 @@ class Main extends PluginBase implements Listener{
                 $sender->sendMessage(
                     $this->config->getNested("messages.afk-on")
                 );
-                $this->executeAction($sender);
             }
 
             return true;
@@ -218,7 +225,34 @@ class Main extends PluginBase implements Listener{
 
         return false;
     }
+
+    private function openAFKGUI(Player $player): void{
+
+        $form = [
+            "type" => "form",
+            "title" => "AFK Players",
+            "content" => "List of AFK players",
+            "buttons" => []
+        ];
+
+        foreach(array_keys($this->afkPlayers) as $name){
+            $form["buttons"][] = [
+                "text" => $name,
+                "image" => [
+                    "type" => "path",
+                    "data" => "textures/items/skull_skeleton"
+                ]
+            ];
+        }
+
+        if(empty($form["buttons"])){
+            $form["content"] = "No AFK players.";
+        }
+
+        $player->sendForm($form);
+    }
 }
+
 
 
 
