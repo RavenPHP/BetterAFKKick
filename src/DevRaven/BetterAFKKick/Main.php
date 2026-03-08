@@ -159,7 +159,6 @@ class Main extends PluginBase implements Listener{
             $server = $servers[array_rand($servers)];
             [$ip, $port] = explode(":", $server);
 
-            // ✅ Correct PM5 way
             $player->getNetworkSession()->sendDataPacket(
                 TransferPacket::create($ip, (int)$port)
             );
@@ -220,5 +219,6 @@ class Main extends PluginBase implements Listener{
         return false;
     }
 }
+
 
 
