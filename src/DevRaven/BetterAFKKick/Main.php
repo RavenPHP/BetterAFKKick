@@ -11,6 +11,7 @@ use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
 use pocketmine\event\player\PlayerMoveEvent;
 use pocketmine\scheduler\ClosureTask;
+use pocketmine\scheduler\CancelTaskException;
 use pocketmine\network\mcpe\protocol\TransferPacket;
 
 class Main extends PluginBase implements Listener{
@@ -24,10 +25,14 @@ class Main extends PluginBase implements Listener{
         @mkdir($this->getDataFolder());
         $this->saveResource("config.yml");
 
-        $this->config = new Config($this->getDataFolder() . "config.yml", Config::YAML);
+        $this->config = new Config(
+            $this->getDataFolder() . "config.yml",
+            Config::YAML
+        );
 
         $this->getServer()->getPluginManager()->registerEvents($this, $this);
 
+        // Runs every 1 second
         $this->getScheduler()->scheduleRepeatingTask(
             new ClosureTask(function(): void{
                 $this->checkAFK();
@@ -51,26 +56,29 @@ class Main extends PluginBase implements Listener{
             return;
         }
 
-        // Ignore movement inside the same block
-        if($from->getFloorX() === $to->getFloorX() &&
-           $from->getFloorY() === $to->getFloorY() &&
-           $from->getFloorZ() === $to->getFloorZ()){
+        // Ignore movement inside same block
+        if(
+            $from->getFloorX() === $to->getFloorX() &&
+            $from->getFloorY() === $to->getFloorY() &&
+            $from->getFloorZ() === $to->getFloorZ()
+        ){
             return;
         }
 
-        $threshold = $this->config->get("movement-threshold");
+        $threshold = (float)$this->config->get("movement-threshold");
 
-        // Optimized distance check (no sqrt)
+        // Optimized distance check
         if($from->distanceSquared($to) > ($threshold * $threshold)){
-            $this->lastActivity[$player->getName()] = time();
-            unset($this->afkPlayers[$player->getName()]);
+            $name = $player->getName();
+            $this->lastActivity[$name] = time();
+            unset($this->afkPlayers[$name]);
         }
     }
 
     private function checkAFK(): void{
 
-        $afkTime = $this->config->get("afk-time");
-        $countdown = $this->config->get("countdown");
+        $afkTime = (int)$this->config->get("afk-time");
+        $countdown = (int)$this->config->get("countdown");
 
         foreach(Server::getInstance()->getOnlinePlayers() as $player){
 
@@ -97,33 +105,29 @@ class Main extends PluginBase implements Listener{
 
         $actionbar = $this->config->getNested("messages.actionbar");
 
-        $task = null;
+        $this->getScheduler()->scheduleRepeatingTask(
+            new ClosureTask(function() use ($player, &$seconds, $actionbar): void{
 
-        $task = new ClosureTask(function() use ($player, &$seconds, $actionbar, &$task): void{
+                if(
+                    !$player->isOnline() ||
+                    !isset($this->afkPlayers[$player->getName()])
+                ){
+                    throw new CancelTaskException();
+                }
 
-            if(!$player->isOnline()){
-                $task->cancel();
-                return;
-            }
+                if($seconds <= 0){
+                    $this->executeAction($player);
+                    throw new CancelTaskException();
+                }
 
-            if(!isset($this->afkPlayers[$player->getName()])){
-                $task->cancel();
-                return;
-            }
+                $msg = str_replace("{seconds}", (string)$seconds, $actionbar);
+                $player->sendActionBarMessage($msg);
 
-            if($seconds <= 0){
-                $task->cancel();
-                $this->executeAction($player);
-                return;
-            }
+                $seconds--;
 
-            $msg = str_replace("{seconds}", (string)$seconds, $actionbar);
-            $player->sendActionBarMessage($msg);
-
-            $seconds--;
-        });
-
-        $this->getScheduler()->scheduleRepeatingTask($task, 20);
+            }),
+            20
+        );
     }
 
     private function executeAction(Player $player): void{
@@ -137,11 +141,11 @@ class Main extends PluginBase implements Listener{
 
         if($mode === "teleport"){
 
-            $world = $this->config->getNested("teleport.world");
-            $w = Server::getInstance()->getWorldManager()->getWorldByName($world);
+            $worldName = $this->config->getNested("teleport.world");
+            $world = Server::getInstance()->getWorldManager()->getWorldByName($worldName);
 
-            if($w !== null){
-                $player->teleport($w->getSpawnLocation());
+            if($world !== null){
+                $player->teleport($world->getSpawnLocation());
             }
 
             return;
@@ -166,7 +170,12 @@ class Main extends PluginBase implements Listener{
         }
     }
 
-    public function onCommand(CommandSender $sender, Command $command, string $label, array $args): bool{
+    public function onCommand(
+        CommandSender $sender,
+        Command $command,
+        string $label,
+        array $args
+    ): bool{
 
         if(!$sender instanceof Player){
             return true;
@@ -177,14 +186,18 @@ class Main extends PluginBase implements Listener{
             if(isset($args[0]) && $args[0] === "list"){
 
                 if(empty($this->afkPlayers)){
-                    $sender->sendMessage($this->config->getNested("messages.no-afk"));
+                    $sender->sendMessage(
+                        $this->config->getNested("messages.no-afk")
+                    );
                     return true;
                 }
 
-                $sender->sendMessage($this->config->getNested("messages.afk-list-header"));
+                $sender->sendMessage(
+                    $this->config->getNested("messages.afk-list-header")
+                );
 
-                foreach(array_keys($this->afkPlayers) as $player){
-                    $sender->sendMessage("§7- " . $player);
+                foreach(array_keys($this->afkPlayers) as $name){
+                    $sender->sendMessage("§7- " . $name);
                 }
 
                 return true;
@@ -194,10 +207,14 @@ class Main extends PluginBase implements Listener{
 
             if(isset($this->afkPlayers[$name])){
                 unset($this->afkPlayers[$name]);
-                $sender->sendMessage($this->config->getNested("messages.afk-off"));
+                $sender->sendMessage(
+                    $this->config->getNested("messages.afk-off")
+                );
             }else{
                 $this->afkPlayers[$name] = true;
-                $sender->sendMessage($this->config->getNested("messages.afk-on"));
+                $sender->sendMessage(
+                    $this->config->getNested("messages.afk-on")
+                );
                 $this->executeAction($sender);
             }
 
@@ -207,3 +224,4 @@ class Main extends PluginBase implements Listener{
         return false;
     }
 }
+
