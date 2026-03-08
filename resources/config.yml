@@ -8,7 +8,7 @@ countdown: 10
 movement-threshold: 0.15
 
 # Mode: kick / teleport / transfer
-mode: "transfer"
+mode: "kick"
 
 kick:
   message: "§cYou were kicked for being AFK."
@@ -20,6 +20,12 @@ transfer:
   servers:
     - "127.0.0.1:19133"
     - "127.0.0.1:19134"
+
+# Title settings when player becomes AFK
+title:
+  title: "§cYOU ARE AFK"
+  subtitle: "§7You gonna be kicked soon if you don't move"
+  sound: "note.bell"
 
 messages:
   actionbar: "§eYou will be moved in {seconds}s"
