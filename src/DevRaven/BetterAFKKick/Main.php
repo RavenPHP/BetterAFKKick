@@ -26,17 +26,12 @@ class Main extends PluginBase implements Listener{
         @mkdir($this->getDataFolder());
         $this->saveResource("config.yml");
 
-        $this->config = new Config(
-            $this->getDataFolder() . "config.yml",
-            Config::YAML
-        );
+        $this->config = new Config($this->getDataFolder() . "config.yml", Config::YAML);
 
         $this->getServer()->getPluginManager()->registerEvents($this, $this);
 
         $this->getScheduler()->scheduleRepeatingTask(
-            new ClosureTask(function(): void{
-                $this->checkAFK();
-            }),
+            new ClosureTask(fn() => $this->checkAFK()),
             20
         );
     }
@@ -64,7 +59,7 @@ class Main extends PluginBase implements Listener{
             return;
         }
 
-        $threshold = (float)$this->config->get("movement-threshold");
+        $threshold = (float)$this->config->get("movement-threshold", 0.15);
 
         if($from->distanceSquared($to) > ($threshold * $threshold)){
             $name = $player->getName();
@@ -75,8 +70,8 @@ class Main extends PluginBase implements Listener{
 
     private function checkAFK(): void{
 
-        $afkTime = (int)$this->config->get("afk-time");
-        $countdown = (int)$this->config->get("countdown");
+        $afkTime = (int)$this->config->get("afk-time", 180);
+        $countdown = (int)$this->config->get("countdown", 10);
 
         foreach(Server::getInstance()->getOnlinePlayers() as $player){
 
@@ -101,21 +96,16 @@ class Main extends PluginBase implements Listener{
 
     private function startCountdown(Player $player, int $seconds): void{
 
-        $title = $this->config->getNested("title.title");
-        $subtitle = $this->config->getNested("title.subtitle");
-        $sound = $this->config->getNested("title.sound");
+        $title = (string)$this->config->getNested("title.title", "§cYOU ARE AFK");
+        $subtitleTemplate = (string)$this->config->getNested("title.subtitle", "§7You will be kicked in {cooldown}s");
+        $sound = (string)$this->config->getNested("title.sound", "note.bell");
 
-        $actionbar = $this->config->getNested("messages.actionbar");
-
-        $player->sendTitle($title, $subtitle, 10, 40, 10);
+        $actionbar = (string)$this->config->getNested("messages.actionbar", "§eMove or you will be moved in {seconds}s");
 
         $this->getScheduler()->scheduleRepeatingTask(
-            new ClosureTask(function() use ($player, &$seconds, $actionbar, $sound): void{
+            new ClosureTask(function() use ($player, &$seconds, $title, $subtitleTemplate, $sound, $actionbar): void{
 
-                if(
-                    !$player->isOnline() ||
-                    !isset($this->afkPlayers[$player->getName()])
-                ){
+                if(!$player->isOnline() || !isset($this->afkPlayers[$player->getName()])){
                     throw new CancelTaskException();
                 }
 
@@ -123,6 +113,9 @@ class Main extends PluginBase implements Listener{
                     $this->executeAction($player);
                     throw new CancelTaskException();
                 }
+
+                $subtitle = str_replace("{cooldown}", (string)$seconds, $subtitleTemplate);
+                $player->sendTitle($title, $subtitle, 5, 20, 5);
 
                 $msg = str_replace("{seconds}", (string)$seconds, $actionbar);
                 $player->sendActionBarMessage($msg);
@@ -146,16 +139,16 @@ class Main extends PluginBase implements Listener{
 
     private function executeAction(Player $player): void{
 
-        $mode = $this->config->get("mode");
+        $mode = $this->config->get("mode", "kick");
 
         if($mode === "kick"){
-            $player->kick($this->config->getNested("kick.message"));
+            $player->kick($this->config->getNested("kick.message", "§cYou were kicked for being AFK."));
             return;
         }
 
         if($mode === "teleport"){
 
-            $worldName = $this->config->getNested("teleport.world");
+            $worldName = $this->config->getNested("teleport.world", "world");
             $world = Server::getInstance()->getWorldManager()->getWorldByName($worldName);
 
             if($world !== null){
@@ -167,27 +160,26 @@ class Main extends PluginBase implements Listener{
 
         if($mode === "transfer"){
 
-            $servers = $this->config->getNested("transfer.servers");
+            $servers = $this->config->getNested("transfer.servers", []);
 
             if(empty($servers)){
                 return;
             }
 
             $server = $servers[array_rand($servers)];
-            [$ip, $port] = explode(":", $server);
 
-            $player->getNetworkSession()->sendDataPacket(
-                TransferPacket::create($ip, (int)$port)
-            );
+            if(strpos($server, ":") !== false){
+
+                [$ip, $port] = explode(":", $server);
+
+                $player->getNetworkSession()->sendDataPacket(
+                    TransferPacket::create($ip, (int)$port, false)
+                );
+            }
         }
     }
 
-    public function onCommand(
-        CommandSender $sender,
-        Command $command,
-        string $label,
-        array $args
-    ): bool{
+    public function onCommand(CommandSender $sender, Command $command, string $label, array $args): bool{
 
         if(!$sender instanceof Player){
             return true;
@@ -210,14 +202,10 @@ class Main extends PluginBase implements Listener{
 
             if(isset($this->afkPlayers[$name])){
                 unset($this->afkPlayers[$name]);
-                $sender->sendMessage(
-                    $this->config->getNested("messages.afk-off")
-                );
+                $sender->sendMessage($this->config->getNested("messages.afk-off", "§aYou are no longer AFK."));
             }else{
                 $this->afkPlayers[$name] = true;
-                $sender->sendMessage(
-                    $this->config->getNested("messages.afk-on")
-                );
+                $sender->sendMessage($this->config->getNested("messages.afk-on", "§7You are now AFK."));
             }
 
             return true;
@@ -252,6 +240,7 @@ class Main extends PluginBase implements Listener{
         $player->sendForm($form);
     }
 }
+
 
 
 
